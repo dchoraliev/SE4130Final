@@ -52,6 +52,8 @@ DFSDM_Channel_HandleTypeDef hdfsdm2_channel7;
 
 FMPI2C_HandleTypeDef hfmpi2c1;
 
+I2C_HandleTypeDef hi2c2;
+
 QSPI_HandleTypeDef hqspi;
 
 UART_HandleTypeDef huart10;
@@ -60,12 +62,33 @@ UART_HandleTypeDef huart6;
 SRAM_HandleTypeDef hsram1;
 SRAM_HandleTypeDef hsram2;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
+/* Definitions for drawScreen */
+osThreadId_t drawScreenHandle;
+const osThreadAttr_t drawScreen_attributes = {
+  .name = "drawScreen",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for updateJoystick */
+osThreadId_t updateJoystickHandle;
+const osThreadAttr_t updateJoystick_attributes = {
+  .name = "updateJoystick",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for gameLogic */
+osThreadId_t gameLogicHandle;
+const osThreadAttr_t gameLogic_attributes = {
+  .name = "gameLogic",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for handleBttnPress */
+osThreadId_t handleBttnPressHandle;
+const osThreadAttr_t handleBttnPress_attributes = {
+  .name = "handleBttnPress",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
 
@@ -83,7 +106,11 @@ static void MX_FSMC_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_UART10_Init(void);
 static void MX_USART6_UART_Init(void);
-void StartDefaultTask(void *argument);
+static void MX_I2C2_Init(void);
+void StartDrawScreen(void *argument);
+void StartUpdateJoystick(void *argument);
+void StartGameLogic(void *argument);
+void StartHandleBttnPress(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -132,6 +159,7 @@ int main(void)
   MX_QUADSPI_Init();
   MX_UART10_Init();
   MX_USART6_UART_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -156,8 +184,17 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* creation of drawScreen */
+  drawScreenHandle = osThreadNew(StartDrawScreen, NULL, &drawScreen_attributes);
+
+  /* creation of updateJoystick */
+  updateJoystickHandle = osThreadNew(StartUpdateJoystick, NULL, &updateJoystick_attributes);
+
+  /* creation of gameLogic */
+  gameLogicHandle = osThreadNew(StartGameLogic, NULL, &gameLogic_attributes);
+
+  /* creation of handleBttnPress */
+  handleBttnPressHandle = osThreadNew(StartHandleBttnPress, NULL, &handleBttnPress_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -458,6 +495,40 @@ static void MX_FMPI2C1_Init(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
   * @brief QUADSPI Initialization Function
   * @param None
   * @retval None
@@ -678,14 +749,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SD_Detect_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : ARD_D15_Pin ARD_D14_Pin */
-  GPIO_InitStruct.Pin = ARD_D15_Pin|ARD_D14_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /*Configure GPIO pin : ARD_D13_Pin */
   GPIO_InitStruct.Pin = ARD_D13_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -874,14 +937,14 @@ static void MX_FSMC_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartDrawScreen */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the drawScreen thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_StartDrawScreen */
+void StartDrawScreen(void *argument)
 {
   /* init code for USB_HOST */
   MX_USB_HOST_Init();
@@ -892,6 +955,60 @@ void StartDefaultTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartUpdateJoystick */
+/**
+* @brief Function implementing the updateJoystick thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUpdateJoystick */
+void StartUpdateJoystick(void *argument)
+{
+  /* USER CODE BEGIN StartUpdateJoystick */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUpdateJoystick */
+}
+
+/* USER CODE BEGIN Header_StartGameLogic */
+/**
+* @brief Function implementing the gameLogic thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartGameLogic */
+void StartGameLogic(void *argument)
+{
+  /* USER CODE BEGIN StartGameLogic */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartGameLogic */
+}
+
+/* USER CODE BEGIN Header_StartHandleBttnPress */
+/**
+* @brief Function implementing the handleBttnPress thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartHandleBttnPress */
+void StartHandleBttnPress(void *argument)
+{
+  /* USER CODE BEGIN StartHandleBttnPress */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartHandleBttnPress */
 }
 
 /**
