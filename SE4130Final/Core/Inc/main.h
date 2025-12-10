@@ -101,10 +101,10 @@ void Error_Handler(void);
 #define ARD_A0_GPIO_Port GPIOC
 #define CTP_INT_Pin GPIO_PIN_1
 #define CTP_INT_GPIO_Port GPIOC
-#define CODEC_ext_SD_Pin GPIO_PIN_2
-#define CODEC_ext_SD_GPIO_Port GPIOC
-#define CODEC_SD_Pin GPIO_PIN_3
-#define CODEC_SD_GPIO_Port GPIOC
+#define JOYSTICK_X_Pin GPIO_PIN_2
+#define JOYSTICK_X_GPIO_Port GPIOC
+#define JOYSTICK_Y_Pin GPIO_PIN_3
+#define JOYSTICK_Y_GPIO_Port GPIOC
 #define B_USER_Pin GPIO_PIN_0
 #define B_USER_GPIO_Port GPIOA
 #define ARD_A1_Pin GPIO_PIN_1
@@ -259,8 +259,8 @@ void Error_Handler(void);
 #define WIFI_SPI_CSN_GPIO_Port GPIOG
 #define WIFI_DRDY_Pin GPIO_PIN_12
 #define WIFI_DRDY_GPIO_Port GPIOG
-#define ARD_D2_Pin GPIO_PIN_13
-#define ARD_D2_GPIO_Port GPIOG
+#define BUTTON_Pin GPIO_PIN_13
+#define BUTTON_GPIO_Port GPIOG
 #define VCP_TX_Pin GPIO_PIN_14
 #define VCP_TX_GPIO_Port GPIOG
 #define CODEC_INT_Pin GPIO_PIN_15
