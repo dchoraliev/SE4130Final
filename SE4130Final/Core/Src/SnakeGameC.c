@@ -6,281 +6,215 @@
  */
 
 
-// SnakeGameC.c
 #include "SnakeGameC.h"
-#include <stdlib.h>  // for rand()
-// #include <time.h> // optional if we want to seed srand() with time
+#include <stdlib.h>  // rand()
+#include <string.h>  // memcpy
 
-typedef struct {
-    uint8_t x;
-    uint8_t y;
-} SnakePosition;
-
-// Internal game state
-static SnakePosition snakeBody[SNAKE_MAX_LENGTH];
-static uint16_t snakeLength = 0;
+// Internal buffer of positions (ring buffer)
+static SnakePos_t snakeBuf[SNAKE_MAX_LENGTH];
+static size_t snakeLen = 0;        // number of occupied entries
+static size_t headIdx = 0;         // index in snakeBuf where the head sits
 static SnakeDirection currentDirection = SNAKE_DIR_RIGHT;
-static uint8_t gameOver = 0;
-static SnakePosition foodPos;
+
+static SnakePos_t foodPos;
 static uint16_t score = 0;
 
-// High-level state (menu / playing / paused / game over)
 static SnakeGameState_t gameState = SNAKE_GAME_STATE_MENU;
+static uint8_t gameOver = 0;
 
-// Forward declarations of internal helpers
-static void SnakeGame_InternalResetBoard(void);
-static void SnakeGame_SpawnFood(void);
-static uint8_t SnakeGame_IsSnakeAt(uint8_t x, uint8_t y);
-static uint8_t SnakeGame_CheckSelfCollision(uint8_t newHeadX, uint8_t newHeadY);
+// Forward declarations
+static void internal_placeInitialSnake(void);
+static void internal_spawnFood(void);
+static int internal_isSnakeAt(uint8_t x, uint8_t y);
+static int internal_checkSelfCollision(uint8_t newX, uint8_t newY);
 
-// -----------------------------------------------------------
-// Public API
-// -----------------------------------------------------------
+// ---------------- Public API ----------------
 
 void SnakeGame_Init(void)
 {
-    // If you want, you can seed RNG here:
-    // srand((unsigned int)time(NULL));
-
+    // srand seed choice left to user or hardware RNG; default is deterministic.
     score = 0;
     gameOver = 0;
     gameState = SNAKE_GAME_STATE_MENU;
-
-    // Prepare a valid board (snake in the middle) even in menu state.
-    SnakeGame_InternalResetBoard();
+    internal_placeInitialSnake();
 }
 
 void SnakeGame_Reset(void)
 {
-    // Always reset score and board when starting a fresh game
     score = 0;
     gameOver = 0;
-
-    SnakeGame_InternalResetBoard();
+    internal_placeInitialSnake();
 }
 
 void SnakeGame_SetDirection(SnakeDirection dir)
 {
-    // Prevent 180° reversal
-    if ((currentDirection == SNAKE_DIR_UP    && dir == SNAKE_DIR_DOWN) ||
-        (currentDirection == SNAKE_DIR_DOWN  && dir == SNAKE_DIR_UP)   ||
-        (currentDirection == SNAKE_DIR_LEFT  && dir == SNAKE_DIR_RIGHT)||
-        (currentDirection == SNAKE_DIR_RIGHT && dir == SNAKE_DIR_LEFT))
-    {
-        // Ignore invalid reverse direction
+    // Prevent 180-degree reversal based on currentDirection
+    if ((currentDirection == SNAKE_DIR_UP && dir == SNAKE_DIR_DOWN) ||
+        (currentDirection == SNAKE_DIR_DOWN && dir == SNAKE_DIR_UP) ||
+        (currentDirection == SNAKE_DIR_LEFT && dir == SNAKE_DIR_RIGHT) ||
+        (currentDirection == SNAKE_DIR_RIGHT && dir == SNAKE_DIR_LEFT)) {
         return;
     }
-
     currentDirection = dir;
 }
 
 void SnakeGame_Tick(void)
 {
-    // Only update game when we are actively playing
-    if (gameState != SNAKE_GAME_STATE_PLAYING) {
-        return;
-    }
+    if (gameState != SNAKE_GAME_STATE_PLAYING) return;
+    if (gameOver) return;
 
-    if (gameOver) {
-        return;
-    }
+    // current head position
+    SnakePos_t head = snakeBuf[headIdx];
+    int newX = head.x;
+    int newY = head.y;
 
-    // Current head position
-    SnakePosition head = snakeBody[0];
-    uint8_t newHeadX = head.x;
-    uint8_t newHeadY = head.y;
-
-    // Move head based on currentDirection
     switch (currentDirection) {
         case SNAKE_DIR_UP:
-            if (newHeadY == 0) {
-                gameOver = 1;
-                gameState = SNAKE_GAME_STATE_GAME_OVER;
-                return;
-            }
-            newHeadY--;
-            break;
-
+            if (newY == 0) { gameOver = 1; gameState = SNAKE_GAME_STATE_GAME_OVER; return; }
+            newY--; break;
         case SNAKE_DIR_DOWN:
-            if (newHeadY >= (SNAKE_BOARD_HEIGHT - 1)) {
-                gameOver = 1;
-                gameState = SNAKE_GAME_STATE_GAME_OVER;
-                return;
-            }
-            newHeadY++;
-            break;
-
+            if (newY >= (SNAKE_BOARD_HEIGHT - 1)) { gameOver = 1; gameState = SNAKE_GAME_STATE_GAME_OVER; return; }
+            newY++; break;
         case SNAKE_DIR_LEFT:
-            if (newHeadX == 0) {
-                gameOver = 1;
-                gameState = SNAKE_GAME_STATE_GAME_OVER;
-                return;
-            }
-            newHeadX--;
-            break;
-
+            if (newX == 0) { gameOver = 1; gameState = SNAKE_GAME_STATE_GAME_OVER; return; }
+            newX--; break;
         case SNAKE_DIR_RIGHT:
-            if (newHeadX >= (SNAKE_BOARD_WIDTH - 1)) {
-                gameOver = 1;
-                gameState = SNAKE_GAME_STATE_GAME_OVER;
-                return;
-            }
-            newHeadX++;
-            break;
-
-        default:
-            break;
+            if (newX >= (SNAKE_BOARD_WIDTH - 1)) { gameOver = 1; gameState = SNAKE_GAME_STATE_GAME_OVER; return; }
+            newX++; break;
+        default: break;
     }
 
-    // Check self-collision
-    if (SnakeGame_CheckSelfCollision(newHeadX, newHeadY)) {
+    // self-collision check: note that moving into the current tail cell is allowed
+    // because the tail will move unless we are growing.
+    if (internal_checkSelfCollision((uint8_t)newX, (uint8_t)newY)) {
         gameOver = 1;
         gameState = SNAKE_GAME_STATE_GAME_OVER;
         return;
     }
 
-    // Check if eating food
-    uint8_t ateFood = (newHeadX == foodPos.x && newHeadY == foodPos.y);
+    // did we eat food?
+    int ate = (newX == foodPos.x && newY == foodPos.y);
 
-    // Shift body: move tail forward
-    for (int16_t i = (int16_t)(snakeLength - 1); i > 0; i--) {
-        snakeBody[i] = snakeBody[i - 1];
-    }
-
-    // Place new head
-    snakeBody[0].x = newHeadX;
-    snakeBody[0].y = newHeadY;
-
-    if (ateFood) {
-        // If we have capacity, grow the snake (duplicate tail)
-        if (snakeLength < SNAKE_MAX_LENGTH) {
-            snakeBody[snakeLength] = snakeBody[snakeLength - 1];
-            snakeLength++;
-        }
+    if (ate) {
+        // Grow: we will add a new head without removing tail (increase length)
+        // head index moves backward one step in buffer
+        headIdx = (headIdx == 0) ? (SNAKE_MAX_LENGTH - 1) : (headIdx - 1);
+        snakeBuf[headIdx].x = (uint8_t)newX;
+        snakeBuf[headIdx].y = (uint8_t)newY;
+        if (snakeLen < SNAKE_MAX_LENGTH) snakeLen++;
         score++;
-        SnakeGame_SpawnFood();
+        internal_spawnFood();
+    } else {
+        // Move: overwrite the tail entry with new head and advance headIdx to that entry
+        // tail index is (headIdx + snakeLen - 1) % SNAKE_MAX_LENGTH
+        size_t tailIdx = (headIdx + snakeLen - 1) % SNAKE_MAX_LENGTH;
+        // write new head into tail slot (reusing memory) then make it the new head
+        snakeBuf[tailIdx].x = (uint8_t)newX;
+        snakeBuf[tailIdx].y = (uint8_t)newY;
+        headIdx = tailIdx; // new head
+        // snakeLen unchanged
     }
 }
 
 SnakeCellType SnakeGame_GetCell(uint8_t x, uint8_t y)
 {
-    if (x >= SNAKE_BOARD_WIDTH || y >= SNAKE_BOARD_HEIGHT) {
-        return SNAKE_CELL_EMPTY;
-    }
+    if (x >= SNAKE_BOARD_WIDTH || y >= SNAKE_BOARD_HEIGHT) return SNAKE_CELL_EMPTY;
 
-    // Check snake body
-    for (uint16_t i = 0; i < snakeLength; i++) {
-        if (snakeBody[i].x == x && snakeBody[i].y == y) {
-            return SNAKE_CELL_SNAKE;
-        }
-    }
+    if (foodPos.x == x && foodPos.y == y) return SNAKE_CELL_FOOD;
 
-    // Check food
-    if (foodPos.x == x && foodPos.y == y) {
-        return SNAKE_CELL_FOOD;
+    // iterate snake segments (snakeLen entries starting at headIdx)
+    for (size_t i = 0; i < snakeLen; i++) {
+        size_t idx = (headIdx + i) % SNAKE_MAX_LENGTH;
+        if (snakeBuf[idx].x == x && snakeBuf[idx].y == y) return SNAKE_CELL_SNAKE;
     }
-
     return SNAKE_CELL_EMPTY;
 }
 
-uint8_t SnakeGame_IsGameOver(void)
-{
-    return (gameState == SNAKE_GAME_STATE_GAME_OVER) ? 1U : 0U;
-}
-
-uint16_t SnakeGame_GetScore(void)
-{
-    return score;
-}
-
-SnakeGameState_t SnakeGame_GetState(void)
-{
-    return gameState;
-}
+uint8_t SnakeGame_IsGameOver(void) { return (gameState == SNAKE_GAME_STATE_GAME_OVER) ? 1U : 0U; }
+uint16_t SnakeGame_GetScore(void) { return score; }
+SnakeGameState_t SnakeGame_GetState(void) { return gameState; }
 
 void SnakeGame_HandleButtonEvent(ButtonEvent_t evt)
 {
-    if (evt == BUTTON_EVENT_NONE) {
-        return;
-    }
+    if (evt == BUTTON_EVENT_NONE) return;
 
-    switch (gameState)
-    {
-    case SNAKE_GAME_STATE_MENU:
-        if (evt == BUTTON_EVENT_CLICK) {
-            // Start a new game from the menu
-            SnakeGame_Reset();                      // score -> 0, board reset
-            gameState = SNAKE_GAME_STATE_PLAYING;   // begin playing
-        }
-        break;
-
-    case SNAKE_GAME_STATE_PLAYING:
-        if (evt == BUTTON_EVENT_CLICK) {
-            // Pause the game on click
-            gameState = SNAKE_GAME_STATE_PAUSED;
-        }
-        // (You could also map long-press here to quit directly, if you want)
-        break;
-
-    case SNAKE_GAME_STATE_PAUSED:
-        if (evt == BUTTON_EVENT_CLICK) {
-            // Resume the game
-            gameState = SNAKE_GAME_STATE_PLAYING;
-        } else if (evt == BUTTON_EVENT_LONG_PRESS) {
-            // Quit: go back to menu and reset score/board
-            SnakeGame_Reset();
-            gameState = SNAKE_GAME_STATE_MENU;
-        }
-        break;
-
-    case SNAKE_GAME_STATE_GAME_OVER:
-        if (evt == BUTTON_EVENT_CLICK) {
-            // From game over, a click returns to menu with fresh board
-            SnakeGame_Reset();
-            gameState = SNAKE_GAME_STATE_MENU;
-        }
-        break;
-
-    default:
-        break;
+    switch (gameState) {
+        case SNAKE_GAME_STATE_MENU:
+            if (evt == BUTTON_EVENT_CLICK) {
+                SnakeGame_Reset();
+                gameState = SNAKE_GAME_STATE_PLAYING;
+            }
+            break;
+        case SNAKE_GAME_STATE_PLAYING:
+            if (evt == BUTTON_EVENT_CLICK) {
+                gameState = SNAKE_GAME_STATE_PAUSED;
+            }
+            break;
+        case SNAKE_GAME_STATE_PAUSED:
+            if (evt == BUTTON_EVENT_CLICK) {
+                gameState = SNAKE_GAME_STATE_PLAYING;
+            } else if (evt == BUTTON_EVENT_LONG_PRESS) {
+                SnakeGame_Reset();
+                gameState = SNAKE_GAME_STATE_MENU;
+            }
+            break;
+        case SNAKE_GAME_STATE_GAME_OVER:
+            if (evt == BUTTON_EVENT_CLICK) {
+                SnakeGame_Reset();
+                gameState = SNAKE_GAME_STATE_MENU;
+            }
+            break;
+        default: break;
     }
 }
 
-// -----------------------------------------------------------
-// Internal helpers
-// -----------------------------------------------------------
-
-static void SnakeGame_InternalResetBoard(void)
+// Efficient accessor: copy snake positions into out_array
+size_t SnakeGame_GetSnakePositions(SnakePos_t *out_array, size_t max_slots)
 {
-    // Initial snake in middle of board, length = 3
-    uint8_t startX = SNAKE_BOARD_WIDTH / 2;
-    uint8_t startY = SNAKE_BOARD_HEIGHT / 2;
+    if (!out_array || max_slots == 0) return 0;
+    size_t toCopy = (snakeLen < max_slots) ? snakeLen : max_slots;
+    // copy entries starting from headIdx, for snakeLen items
+    for (size_t i = 0; i < toCopy; i++) {
+        size_t idx = (headIdx + i) % SNAKE_MAX_LENGTH;
+        out_array[i] = snakeBuf[idx];
+    }
+    return toCopy;
+}
 
-    snakeLength = 3;
+size_t SnakeGame_GetSnakeLength(void) { return snakeLen; }
+SnakePos_t SnakeGame_GetFoodPosition(void) { return foodPos; }
+
+// ---------------- Internal helpers ----------------
+
+static void internal_placeInitialSnake(void)
+{
+    // center-ish start
+    uint8_t sx = SNAKE_BOARD_WIDTH / 2;
+    uint8_t sy = SNAKE_BOARD_HEIGHT / 2;
+
+    // reset buffer
+    snakeLen = 3;
+    headIdx = 0;
     currentDirection = SNAKE_DIR_RIGHT;
-    gameOver = 0;
+    snakeBuf[0].x = sx;
+    snakeBuf[0].y = sy;
+    // following segments: right->left
+    snakeBuf[1].x = sx - 1;
+    snakeBuf[1].y = sy;
+    snakeBuf[2].x = sx - 2;
+    snakeBuf[2].y = sy;
 
-    // Head at [0], body follows
-    snakeBody[0].x = startX;
-    snakeBody[0].y = startY;
-
-    snakeBody[1].x = startX - 1;
-    snakeBody[1].y = startY;
-
-    snakeBody[2].x = startX - 2;
-    snakeBody[2].y = startY;
-
-    SnakeGame_SpawnFood();
+    internal_spawnFood();
 }
 
-static void SnakeGame_SpawnFood(void)
+static void internal_spawnFood(void)
 {
-    // Simple approach: random cell that is not occupied by the snake
+    // naive random free cell selection
+    // careful: in degenerate states this loops; it's OK for normal gameplay
     while (1) {
         uint8_t x = (uint8_t)(rand() % SNAKE_BOARD_WIDTH);
         uint8_t y = (uint8_t)(rand() % SNAKE_BOARD_HEIGHT);
-
-        if (!SnakeGame_IsSnakeAt(x, y)) {
+        if (!internal_isSnakeAt(x, y)) {
             foodPos.x = x;
             foodPos.y = y;
             return;
@@ -288,25 +222,33 @@ static void SnakeGame_SpawnFood(void)
     }
 }
 
-static uint8_t SnakeGame_IsSnakeAt(uint8_t x, uint8_t y)
+static int internal_isSnakeAt(uint8_t x, uint8_t y)
 {
-    for (uint16_t i = 0; i < snakeLength; i++) {
-        if (snakeBody[i].x == x && snakeBody[i].y == y) {
-            return 1U;
-        }
+    for (size_t i = 0; i < snakeLen; i++) {
+        size_t idx = (headIdx + i) % SNAKE_MAX_LENGTH;
+        if (snakeBuf[idx].x == x && snakeBuf[idx].y == y) return 1;
     }
-    return 0U;
+    return 0;
 }
 
-static uint8_t SnakeGame_CheckSelfCollision(uint8_t newHeadX, uint8_t newHeadY)
+// Note: This version allows moving into the current tail cell (unless we are about to grow)
+// To implement that correctly: if new head == tail and !ateFood -> it's allowed
+static int internal_checkSelfCollision(uint8_t newX, uint8_t newY)
 {
-    // If new head position overlaps any existing segment -> collision
-    for (uint16_t i = 0; i < snakeLength; i++) {
-        if (snakeBody[i].x == newHeadX && snakeBody[i].y == newHeadY) {
-            return 1U;
+    // If new head equals food, we will grow so tail won't move -> check entire body for collision
+    int willGrow = (newX == foodPos.x && newY == foodPos.y);
+
+    // iterate through segments
+    for (size_t i = 0; i < snakeLen; i++) {
+        size_t idx = (headIdx + i) % SNAKE_MAX_LENGTH;
+        // if we are not growing, the tail will vacate its cell so allow stepping into tail
+        if (!willGrow && (i == (snakeLen - 1))) {
+            // tail index, allowed
+            continue;
         }
+        if (snakeBuf[idx].x == newX && snakeBuf[idx].y == newY) return 1;
     }
-    return 0U;
+    return 0;
 }
 
 
