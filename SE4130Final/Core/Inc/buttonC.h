@@ -2,7 +2,7 @@
  * buttonC.h
  *
  *  Created on: Dec 9, 2025
- *      Initial Author: breuv
+ *
  */
 
 #ifndef INC_BUTTONC_H_

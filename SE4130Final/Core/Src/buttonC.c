@@ -2,7 +2,7 @@
  * buttonC.c
  *
  *  Created on: Dec 9, 2025
- *      Author: breuv
+ *
  */
 
 #include "buttonC.h"
