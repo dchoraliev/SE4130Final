@@ -1001,12 +1001,15 @@ void StartDrawScreen(void *argument)
 		  //Updates the last state
 		  lastState = currentState;
 
-		  //Updates the snake if currently playing
-		  if (currentState == SNAKE_GAME_STATE_PLAYING)
-		  {
-			UpdateSnakePosition();
-			UpdateGameScore(SnakeGame_GetScore());
-		  }
+
+	  }
+
+	  //Updates the snake if currently playing
+	  if (currentState == SNAKE_GAME_STATE_PLAYING)
+	  {
+		HAL_GPIO_TogglePin(LED1_RED_GPIO_Port, LED1_RED_Pin);
+		UpdateSnakePosition();
+		UpdateGameScore(SnakeGame_GetScore());
 	  }
 
 	  osDelay(30);//<--This directly relates to FPS for future reference
@@ -1071,7 +1074,7 @@ void StartGameLogic(void *argument)
   {
 	  SnakeGame_Tick();
 
-	  osDelayUntil(200);//<--This is the snake speed for future reference
+	  osDelay(200);//<--This is the snake speed for future reference
   }
   /* USER CODE END StartGameLogic */
 }
@@ -1090,15 +1093,17 @@ void StartHandleBttnPress(void *argument)
   /* Infinite loop */
   for(;;)
   {
+
 	  Button_Update(&button, osKernelGetTickCount());
 
-	  ButtonEvent_t evt = Button_GetEvent(&button);
-	  if (evt != BUTTON_EVENT_NONE)
+	  ButtonEvent_t event = Button_GetEvent(&button);
+	  if (event != BUTTON_EVENT_NONE)
 	  {
-		SnakeGame_HandleButtonEvent(evt);
+		SnakeGame_HandleButtonEvent(event);
+		HAL_GPIO_TogglePin(LED2_GREEN_GPIO_Port, LED2_GREEN_Pin);
 	  }
 
-	  osDelayUntil(BUTTON_UPDATE_PERIOD_MS);
+	  osDelay(BUTTON_UPDATE_PERIOD_MS);
   }
 
   /* USER CODE END StartHandleBttnPress */
