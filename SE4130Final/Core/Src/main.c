@@ -23,7 +23,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "SnakeGameC.h"
+#include "SnakeGameScreen.h"
+#include "joystickC.h"
+#include "buttonC.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -91,6 +94,9 @@ const osThreadAttr_t handleBttnPress_attributes = {
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
+
+Joystick_HandleTypeDef joystick;
+Button_HandleTypeDef button;
 
 /* USER CODE END PV */
 
@@ -161,6 +167,14 @@ int main(void)
   MX_USART6_UART_Init();
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
+
+  //Initializes everything
+  SnakeGame_Init();
+  SnakeGameScreen_Init();
+  Joystick_Init(&joystick, &hadc1,
+                ADC_CHANNEL_10,//PC1 ADC channel
+				ADC_CHANNEL_1);//PA0 ADC channel
+  Button_Init(&button, BUTTON_GPIO_Port, BUTTON_Pin);
 
   /* USER CODE END 2 */
 
@@ -712,11 +726,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B_USER_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : JOSTICK_Y_Pin */
-  GPIO_InitStruct.Pin = JOSTICK_Y_Pin;
+  /*Configure GPIO pin : JOYSTICK_Y_Pin */
+  GPIO_InitStruct.Pin = JOYSTICK_Y_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(JOSTICK_Y_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(JOYSTICK_Y_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CODEC_MCK_Pin */
   GPIO_InitStruct.Pin = CODEC_MCK_Pin;
@@ -955,10 +969,48 @@ void StartDrawScreen(void *argument)
   /* init code for USB_HOST */
   MX_USB_HOST_Init();
   /* USER CODE BEGIN 5 */
+
+  SnakeGameState_t lastState = SNAKE_GAME_STATE_MENU;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  //Gets the current state
+	  SnakeGameState_t currentState = SnakeGame_GetState();
+
+	  //Checks if the state has changed
+	  if (currentState != lastState)
+	  {
+		  if(currentState == SNAKE_GAME_STATE_MENU)
+		  {
+			  DrawMainMenu();
+		  }
+		  else if(currentState == SNAKE_GAME_STATE_PLAYING)
+		  {
+	          DrawGameScreen();
+	          UpdateGameScore(SnakeGame_GetScore());
+		  }
+		  else if(currentState == SNAKE_GAME_STATE_PAUSED)
+		  {
+			  DrawPauseMenu();
+		  }
+		  else if(currentState == SNAKE_GAME_STATE_GAME_OVER)
+		  {
+			  DrawGameOverMenu();
+		  }
+
+		  //Updates the last state
+		  lastState = currentState;
+
+		  //Updates the snake if currently playing
+		  if (currentState == SNAKE_GAME_STATE_PLAYING)
+		  {
+			UpdateSnakePosition();
+			UpdateGameScore(SnakeGame_GetScore());
+		  }
+	  }
+
+	  osDelay(30);//<--This directly relates to FPS for future reference
+
   }
   /* USER CODE END 5 */
 }
@@ -973,10 +1025,33 @@ void StartDrawScreen(void *argument)
 void StartUpdateJoystick(void *argument)
 {
   /* USER CODE BEGIN StartUpdateJoystick */
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	 //Gets the current joystick direction
+	 JoystickDirection direction = Joystick_GetDirection(&joystick);
+
+	 //Updates the game direction accordingly
+	 if(direction == UP)
+	 {
+		 SnakeGame_SetDirection(SNAKE_DIR_UP);
+	 }
+	 else if(direction == DOWN)
+	 {
+		 SnakeGame_SetDirection(SNAKE_DIR_DOWN);
+	 }
+	 else if(direction == LEFT)
+	 {
+		 SnakeGame_SetDirection(SNAKE_DIR_LEFT);
+	 }
+	 else if(direction == RIGHT)
+	 {
+		 SnakeGame_SetDirection(SNAKE_DIR_RIGHT);
+	 }
+
+	  osDelay(25);
+    ;
   }
   /* USER CODE END StartUpdateJoystick */
 }
@@ -994,7 +1069,9 @@ void StartGameLogic(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  SnakeGame_Tick();
+
+	  osDelayUntil(200);//<--This is the snake speed for future reference
   }
   /* USER CODE END StartGameLogic */
 }
@@ -1009,11 +1086,21 @@ void StartGameLogic(void *argument)
 void StartHandleBttnPress(void *argument)
 {
   /* USER CODE BEGIN StartHandleBttnPress */
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  Button_Update(&button, osKernelGetTickCount());
+
+	  ButtonEvent_t evt = Button_GetEvent(&button);
+	  if (evt != BUTTON_EVENT_NONE)
+	  {
+		SnakeGame_HandleButtonEvent(evt);
+	  }
+
+	  osDelayUntil(BUTTON_UPDATE_PERIOD_MS);
   }
+
   /* USER CODE END StartHandleBttnPress */
 }
 
@@ -1058,7 +1145,7 @@ void Error_Handler(void)
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
   * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
+  * @param  line: assert_param error line source numberidk
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)

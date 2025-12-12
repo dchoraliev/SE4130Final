@@ -103,8 +103,8 @@ void Error_Handler(void);
 #define CTP_INT_GPIO_Port GPIOC
 #define B_USER_Pin GPIO_PIN_0
 #define B_USER_GPIO_Port GPIOA
-#define JOSTICK_Y_Pin GPIO_PIN_1
-#define JOSTICK_Y_GPIO_Port GPIOA
+#define JOYSTICK_Y_Pin GPIO_PIN_1
+#define JOYSTICK_Y_GPIO_Port GPIOA
 #define ARD_A2_Pin GPIO_PIN_2
 #define ARD_A2_GPIO_Port GPIOA
 #define CODEC_MCK_Pin GPIO_PIN_3

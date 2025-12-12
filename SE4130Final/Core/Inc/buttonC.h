@@ -2,7 +2,7 @@
  * buttonC.h
  *
  *  Created on: Dec 9, 2025
- *      Author: breuv
+ *      Initial Author: breuv
  */
 
 #ifndef INC_BUTTONC_H_
@@ -10,20 +10,20 @@
 
 #include "stm32f4xx_hal.h"
 
-// How often your button task will call Button_Update (in ms)
+//How often your button task will call Button_Update (in ms)
 #define BUTTON_UPDATE_PERIOD_MS      10U
 
-// Debounce time (ms)
+//Debounce time (ms)
 #define BUTTON_DEBOUNCE_TIME_MS      50U
 
-// Long-press threshold (ms)
+//Long-press threshold (ms)
 #define BUTTON_LONG_PRESS_TIME_MS    1000U
 
 typedef enum
 {
     BUTTON_EVENT_NONE = 0,
-    BUTTON_EVENT_CLICK,       // short press: press + release
-    BUTTON_EVENT_LONG_PRESS   // held longer than threshold, then released
+    BUTTON_EVENT_CLICK,       //short press: press + release
+    BUTTON_EVENT_LONG_PRESS   //held longer than threshold, then released
 } ButtonEvent_t;
 
 typedef enum
