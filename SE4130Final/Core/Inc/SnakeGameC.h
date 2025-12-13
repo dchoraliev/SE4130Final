@@ -18,8 +18,9 @@ extern "C" {
 #endif
 
 // Board dimensions — adjust as needed
-#define SNAKE_BOARD_WIDTH   20
-#define SNAKE_BOARD_HEIGHT  15
+#define GRID_SIZE 6
+#define SNAKE_BOARD_WIDTH   35
+#define SNAKE_BOARD_HEIGHT  32
 #define SNAKE_MAX_LENGTH    (SNAKE_BOARD_WIDTH * SNAKE_BOARD_HEIGHT)
 
 // Simple position type (exposed so draw task can use it)

@@ -10,13 +10,10 @@
 
 #include <stm32f413h_discovery_lcd.h>
 #include "string.h"
+#include "SnakeGameC.h"
 
-#define SCREEN_HEIGHT BSP_LCD_GetYSize();
-#define SCREEN_WIDTH BSP_LCD_GetXSize();
-
-#define GRID_SIZE 4
-#define X_GRIDS 60
-#define Y_GRIDS 60
+#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 240
 
 typedef enum{
 	MENU_START,
@@ -24,8 +21,8 @@ typedef enum{
 } MainMenuChoice;
 
 typedef enum{
-	RESUME,
-	EXIT_TO_HOME
+	PAUSE_RESUME,
+	PAUSE_EXIT_TO_HOME
 } PauseMenuChoice;
 
 typedef enum{
@@ -43,7 +40,7 @@ void DrawGameScreen(void);
 
 void UpdateGameScore(int8_t newScore);
 
-void UpdateSnakePosition(void);
+void UpdateGameBoard(void);
 
 void DrawPauseMenu(void);
 

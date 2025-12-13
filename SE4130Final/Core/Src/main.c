@@ -987,7 +987,6 @@ void StartDrawScreen(void *argument)
 		  else if(currentState == SNAKE_GAME_STATE_PLAYING)
 		  {
 	          DrawGameScreen();
-	          UpdateGameScore(SnakeGame_GetScore());
 		  }
 		  else if(currentState == SNAKE_GAME_STATE_PAUSED)
 		  {
@@ -1008,7 +1007,7 @@ void StartDrawScreen(void *argument)
 	  if (currentState == SNAKE_GAME_STATE_PLAYING)
 	  {
 		HAL_GPIO_TogglePin(LED1_RED_GPIO_Port, LED1_RED_Pin);
-		UpdateSnakePosition();
+		UpdateGameBoard();
 		UpdateGameScore(SnakeGame_GetScore());
 	  }
 

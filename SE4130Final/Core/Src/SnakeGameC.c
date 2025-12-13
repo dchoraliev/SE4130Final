@@ -37,6 +37,7 @@ void SnakeGame_Init(void)
     gameOver = 0;
     gameState = SNAKE_GAME_STATE_MENU;
     internal_placeInitialSnake();
+
 }
 
 void SnakeGame_Reset(void)
