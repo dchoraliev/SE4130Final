@@ -97,24 +97,15 @@ void SnakeGame_Tick(void)
     int ate = (newX == foodPos.x && newY == foodPos.y);
 
     if (ate) {
-        // Grow: we will add a new head without removing tail (increase length)
-        // head index moves backward one step in buffer
-        headIdx = (headIdx == 0) ? (SNAKE_MAX_LENGTH - 1) : (headIdx - 1);
-        snakeBuf[headIdx].x = (uint8_t)newX;
-        snakeBuf[headIdx].y = (uint8_t)newY;
         if (snakeLen < SNAKE_MAX_LENGTH) snakeLen++;
         score++;
         internal_spawnFood();
-    } else {
-        // Move: overwrite the tail entry with new head and advance headIdx to that entry
-        // tail index is (headIdx + snakeLen - 1) % SNAKE_MAX_LENGTH
-        size_t tailIdx = (headIdx + snakeLen - 1) % SNAKE_MAX_LENGTH;
-        // write new head into tail slot (reusing memory) then make it the new head
-        snakeBuf[tailIdx].x = (uint8_t)newX;
-        snakeBuf[tailIdx].y = (uint8_t)newY;
-        headIdx = tailIdx; // new head
-        // snakeLen unchanged
     }
+    for (size_t i = snakeLen - 1; i > 0; i--) {
+        snakeBuf[i] = snakeBuf[i - 1];
+    }
+    snakeBuf[0].x = (uint8_t)newX;
+    snakeBuf[0].y = (uint8_t)newY;
 }
 
 SnakeCellType SnakeGame_GetCell(uint8_t x, uint8_t y)
